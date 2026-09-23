@@ -153,13 +153,12 @@ wss.on('connection', (socket) => {
         const studentId = entry.studentId;
         const team = room.teams.find((t) => t.id === Number(msg.teamId));
         if (!team) return;
-        const already = team.members.some((m) => m.id === studentId);
+        if (team.members.some((m) => m.id === studentId)) return;
+        if (team.members.length >= team.capacity) return;
         for (const t of room.teams) {
           t.members = t.members.filter((m) => m.id !== studentId);
         }
-        if (!already && team.members.length < team.capacity) {
-          team.members.push({ id: studentId, name: entry.name });
-        }
+        team.members.push({ id: studentId, name: entry.name });
         broadcastRoom(room);
         break;
       }

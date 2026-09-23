@@ -14,6 +14,8 @@
   let session = null;
   let reconnectAttempts = 0;
   let roomData = null;
+  const pending = [];
+  let pendingInit = null;
 
   const esc = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({
@@ -32,15 +34,30 @@
   function send(msg) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg));
+    } else {
+      pending.push(msg);
     }
   }
 
-  function sendInit() {
-    if (!session) return;
+  function initMessage() {
+    if (!session) return null;
     if (session.role === 'teacher') {
-      send({ type: 'teacherReconnect', code: session.code, token: session.token });
-    } else {
-      send({ type: 'join', code: session.code, name: session.name, studentId: session.studentId });
+      return { type: 'teacherReconnect', code: session.code, token: session.token };
+    }
+    return { type: 'join', code: session.code, name: session.name, studentId: session.studentId };
+  }
+
+  function flushQueue() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (pendingInit) {
+      ws.send(pendingInit);
+      pendingInit = null;
+    } else if (session) {
+      const msg = initMessage();
+      if (msg) ws.send(JSON.stringify(msg));
+    }
+    while (pending.length) {
+      ws.send(JSON.stringify(pending.shift()));
     }
   }
 
@@ -49,7 +66,7 @@
     ws.onopen = () => {
       reconnectAttempts = 0;
       setBadge('on');
-      if (session) sendInit();
+      flushQueue();
     };
     ws.onmessage = (e) => {
       let msg;
@@ -93,6 +110,8 @@
         saveSession();
         roomData = msg.room;
         goTo(msg.role === 'teacher' ? 'teacher' : 'student');
+        if (msg.role === 'teacher') renderTeacher();
+        else renderStudent();
         break;
 
       case 'room':
@@ -105,7 +124,7 @@
         if (currentView() === 'join') {
           $('#joinError').textContent = msg.message;
           $('#joinError').classList.remove('hidden');
-        } else if (currentView() === 'teacher') {
+        } else if (currentView() === 'teacher' || currentView() === 'student') {
           goHomeAndReset();
         }
         break;
@@ -163,6 +182,8 @@
     e.preventDefault();
     session = null;
     clearStorage();
+    pending.length = 0;
+    pendingInit = null;
     createBtn.disabled = true;
     createBtn.textContent = 'Creando…';
     send({
@@ -180,13 +201,18 @@
 
   // ---------- Join ----------
   const codeParam = new URLSearchParams(location.search).get('codigo');
-  if (codeParam) $('#jCode').value = codeParam;
+  if (codeParam) {
+    $('#jCode').value = codeParam;
+    goTo('join');
+  }
 
   $('#joinForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const sid = localStorage.getItem(LS.studentId) || makeId();
     localStorage.setItem(LS.studentId, sid);
     ['role', 'code', 'token', 'name'].forEach((k) => localStorage.removeItem(LS[k]));
+    pending.length = 0;
+    pendingInit = null;
     session = {
       role: 'student',
       code: $('#jCode').value.trim().toUpperCase(),
@@ -194,7 +220,11 @@
       studentId: sid,
     };
     saveSession();
-    sendInit();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(initMessage()));
+    } else {
+      pendingInit = JSON.stringify(initMessage());
+    }
   });
 
   // ---------- Teacher view ----------
@@ -213,12 +243,14 @@
             <span class="slots ${full ? 'full' : 'free'}">${t.members.length}/${t.capacity}</span>
           </div>
           <div class="teacher-controls">
-            <span class="lbl">Nombre</span>
-            <input value="${esc(t.name)}" maxlength="40"
-              onchange="teacherSetName(${t.id}, this.value)">
-            <span class="lbl">Límite</span>
-            <input type="number" min="1" max="20" value="${t.capacity}"
-              oninput="teacherSetCap(${t.id}, this.value)">
+            <label>Nombre
+              <input value="${esc(t.name)}" maxlength="40"
+                onchange="teacherSetName(${t.id}, this.value)">
+            </label>
+            <label>Límite
+              <input type="number" min="1" max="20" value="${t.capacity}"
+                oninput="teacherSetCap(${t.id}, this.value)">
+            </label>
           </div>
           <div class="members">
             ${t.members.length

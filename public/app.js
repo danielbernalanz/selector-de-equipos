@@ -160,6 +160,8 @@
     if (currentSocket) currentSocket.close();
   }
 
+  window.goHomeAndReset = goHomeAndReset;
+
   function saveSession() {
     if (!session) return;
     localStorage.setItem(LS.role, session.role);

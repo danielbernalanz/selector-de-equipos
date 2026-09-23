@@ -1,0 +1,13 @@
+{
+  "name": "selector-de-equipos",
+  "version": "1.0.0",
+  "description": "Sala para que el profesor cree equipos con límites configurables y los alumnos se unan en tiempo real",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}

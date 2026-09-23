@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selector de Equipos</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="logo">🎯 Selector de Equipos</span>
+    <span id="connBadge" class="badge badge-off">Conectando...</span>
+  </div>
+</header>
+
+<main class="container">
+
+  <section id="view-home" class="view">
+    <div class="card hero">
+      <h1>Forma equipos en minutos</h1>
+      <p>El profesor crea una sala, configura cada equipo con su propio límite de integrantes y los alumnos se unen en tiempo real.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" onclick="goTo('create')">👨‍🏫 Soy profesor</button>
+        <button class="btn btn-outline btn-lg" onclick="goTo('join')">🎒 Soy alumno</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-create" class="view hidden">
+    <div class="card">
+      <button class="btn btn-ghost back" onclick="goTo('home')">← Volver</button>
+      <h2>Crear sala</h2>
+      <form id="createForm">
+        <label>Tu nombre
+          <input id="cTeacherName" type="text" placeholder="Prof. Pérez" required maxlength="40">
+        </label>
+        <label>Materia / clase
+          <input id="cClassName" type="text" placeholder="Matemáticas 2B" maxlength="60">
+        </label>
+        <div class="row">
+          <label>Nº de equipos
+            <input id="cNumTeams" type="number" min="1" max="30" value="4">
+          </label>
+          <label>Límite por defecto
+            <input id="cDefaultCap" type="number" min="1" max="20" value="3">
+          </label>
+        </div>
+        <p class="hint">Podrás cambiar el límite de cada equipo después de crearla.</p>
+        <button class="btn btn-primary btn-block" type="submit">Crear sala</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-join" class="view hidden">
+    <div class="card">
+      <button class="btn btn-ghost back" onclick="goTo('home')">← Volver</button>
+      <h2>Unirme a una sala</h2>
+      <form id="joinForm">
+        <label>Código de la sala
+          <input id="jCode" type="text" placeholder="ABC12" maxlength="6" required style="text-transform:uppercase">
+        </label>
+        <label>Tu nombre
+          <input id="jName" type="text" placeholder="Tu nombre" required maxlength="40">
+        </label>
+        <p id="joinError" class="error hidden"></p>
+        <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-teacher" class="view hidden">
+    <div class="card">
+      <div class="teacher-head">
+        <div>
+          <h2 id="tClassName" class="m0">Sala</h2>
+          <p id="tTeacher" class="muted m0"></p>
+        </div>
+        <div class="code-box">
+          <span class="code-label">Código</span>
+          <span id="tCode" class="code"></span>
+          <button class="btn btn-ghost" onclick="copyLink()" title="Copia el enlace para alumnos">🔗</button>
+        </div>
+      </div>
+      <p class="hint">Cada alumno ve los equipos y solo puede entrar en los que tengan hueco libre.</p>
+      <div id="teacherTeams" class="grid"></div>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="closeRoom()">Cerrar sala</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-student" class="view hidden">
+    <div class="card">
+      <button class="btn btn-ghost back" onclick="leaveRoom()">← Salir</button>
+      <h2 id="sClassName" class="m0">Sala</h2>
+      <p class="muted" id="sTeacher"></p>
+      <p id="sStatus" class="hint"></p>
+      <div id="studentTeams" class="grid"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="closedModal" class="modal-overlay hidden">
+  <div class="card modal">
+    <h2>🔒 Sala cerrada</h2>
+    <p>El profesor cerró la sala.</p>
+    <button class="btn btn-primary btn-block" onclick="goHomeAndReset()">Entendido</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -83,6 +83,20 @@ wss.on('connection', (socket) => {
   let room = null;
   let role = null;
 
+  const detach = () => {
+    if (room) {
+      const entry = room.clients.get(socket);
+      const sid = entry && entry.studentId ? entry.studentId : null;
+      room.clients.delete(socket);
+      if (sid) {
+        for (const t of room.teams) t.members = t.members.filter((m) => m.id !== sid);
+      }
+      broadcastRoom(room);
+      room = null;
+      role = null;
+    }
+  };
+
   socket.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
@@ -125,7 +139,7 @@ wss.on('connection', (socket) => {
       }
 
       case 'join': {
-        if (room || role) return;
+        detach();
         const r = rooms.get(String(msg.code || '').toUpperCase());
         if (!r) {
           socket.send(JSON.stringify({ type: 'error', message: 'Sala no encontrada. Revisa el código.' }));

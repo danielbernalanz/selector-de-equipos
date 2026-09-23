@@ -10,10 +10,10 @@
     name: 'selEqName',
   };
 
-  let ws = null;
   let session = null;
   let reconnectAttempts = 0;
   let roomData = null;
+  let currentSocket = null;
   const pending = [];
   let pendingInit = null;
 
@@ -32,8 +32,8 @@
   }
 
   function send(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(msg));
+    if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+      currentSocket.send(JSON.stringify(msg));
     } else {
       pending.push(msg);
     }
@@ -48,32 +48,35 @@
   }
 
   function flushQueue() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!currentSocket || currentSocket.readyState !== WebSocket.OPEN) return;
     if (pendingInit) {
-      ws.send(pendingInit);
+      currentSocket.send(pendingInit);
       pendingInit = null;
     } else if (session) {
       const msg = initMessage();
-      if (msg) ws.send(JSON.stringify(msg));
+      if (msg) currentSocket.send(JSON.stringify(msg));
     }
     while (pending.length) {
-      ws.send(JSON.stringify(pending.shift()));
+      currentSocket.send(JSON.stringify(pending.shift()));
     }
   }
 
   function connect() {
-    ws = new WebSocket(wsUrl());
-    ws.onopen = () => {
+    const socket = new WebSocket(wsUrl());
+    currentSocket = socket;
+    socket.onopen = () => {
       reconnectAttempts = 0;
       setBadge('on');
       flushQueue();
     };
-    ws.onmessage = (e) => {
+    socket.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch { return; }
       handle(msg);
     };
-    ws.onclose = () => {
+    socket.onclose = () => {
+      if (currentSocket !== socket) return;
+      currentSocket = null;
       if (session) {
         setBadge('warn');
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 6000);
@@ -83,7 +86,15 @@
         setBadge('off');
       }
     };
-    ws.onerror = () => ws.close();
+    socket.onerror = () => socket.close();
+  }
+
+  function ensureConnected() {
+    if (!currentSocket ||
+        currentSocket.readyState === WebSocket.CLOSED ||
+        currentSocket.readyState === WebSocket.CLOSING) {
+      connect();
+    }
   }
 
   function setBadge(state) {
@@ -146,7 +157,7 @@
     clearStorage();
     $('#closedModal').classList.add('hidden');
     goTo('home');
-    if (ws) ws.close();
+    if (currentSocket) currentSocket.close();
   }
 
   function saveSession() {
@@ -184,6 +195,7 @@
     clearStorage();
     pending.length = 0;
     pendingInit = null;
+    ensureConnected();
     createBtn.disabled = true;
     createBtn.textContent = 'Creando…';
     send({
@@ -220,8 +232,9 @@
       studentId: sid,
     };
     saveSession();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(initMessage()));
+    ensureConnected();
+    if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+      currentSocket.send(JSON.stringify(initMessage()));
     } else {
       pendingInit = JSON.stringify(initMessage());
     }
@@ -354,7 +367,7 @@
     clearStorage();
     roomData = null;
     goTo('home');
-    if (ws) ws.close();
+    if (currentSocket) currentSocket.close();
   };
 
   // ---------- Toast ----------
@@ -373,7 +386,9 @@
 
   // ---------- Restore session on reload ----------
   const storedRole = localStorage.getItem(LS.role);
-  if (storedRole) {
+  if (codeParam) {
+    ['role', 'code', 'token', 'name'].forEach((k) => localStorage.removeItem(LS[k]));
+  } else if (storedRole) {
     session = {
       role: storedRole,
       code: localStorage.getItem(LS.code) || '',
